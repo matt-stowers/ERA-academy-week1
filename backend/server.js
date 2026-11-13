@@ -15,13 +15,46 @@ app.get("/", (req,res) => {
 });
 
 // GET /students - returns all students from MySQL
-
 app.get("/students", (req,res) => {
     const sql = 'SELECT * FROM students';
     db.query(sql, (error, results) => {
         if (error) {
             console.error("error getting students:", error);
             return res.status(500).json({error:'failed to get students'});
+        }
+        res.json(results);
+    });
+});
+
+// POST /students - receives new student data and inserts into MySQL
+app.post("/students", (req,res) => {
+    const {first_name, last_name, grade_level} = req.body;
+
+    // validation - reject if any field is missing
+    if (!first_name || !last_name || !grade_level) {
+        return res.status(400).json({error:'First name, Last name & Grade level are required'});
+    }
+    const sql = 'INSERT INTO students (first_name, last_name, grade_level) VALUES (?, ?, ?)';
+    db.query(sql, [first_name, last_name, grade_level], (error, results) => {
+        if (error) {
+        console.error("error adding student:", error);
+        return res.statusMessage(500).json({error:'failed to add student'});
+        }
+        res.status(201).json({
+            message: "student added successfully",
+            studentId: results.insertId
+        });
+    });
+});
+
+// GET /students/:id/assignments - returns one student's assignments and scores
+app.get("/students/:id/assignments", (req, res) => {
+    const {id} = req.params;
+    const sql = 'SELECT assignments.assignment_name, assignments.due_date, assignments.max_points, student_assignments.score, student_assignments.submitted_date, classes.class_name FROM assignments JOIN classes ON assignments.class_id = classes.id LEFT JOIN student_assignments ON student_assignments.assignment_id = assignments.id AND student_assignments.student_id = ? WHERE assignments.class_id IN (SELECT class_id FROM enrollments WHERE student_id = ?)';
+    db.query(sql, [id, id], (error, results) => {
+        if (error) {
+            console.error ('error getting assignments:', error);
+            return res.status(500).json({error:"Failed to get assignments"});
         }
         res.json(results);
     });
